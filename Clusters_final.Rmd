@@ -1,0 +1,126 @@
+---
+title: "Final Clusters"
+output: html_document
+---
+
+```{r}
+# Prepare R session
+set.seed(55)
+```
+
+```{r}
+# Load essential libraries
+library(vdemdata)
+library(subspace)
+library(tidyverse)
+library(ggthemes)
+library(writexl)
+```
+
+```{r}
+# Load the V-Dem dataset
+dem<-vdem %>% select(country_name, year, v2x_api,v2x_mpi,v2x_freexp_altinf,v2x_frassoc_thick,v2x_suffr,v2xel_frefair,v2x_elecoff, v2x_liberal, v2xcl_rol, v2x_jucon, v2xlg_legcon, v2x_partip, v2x_cspart,v2xdd_dd, v2xel_locelec, v2xel_regelec,v2xdl_delib, v2x_egal, v2xeg_eqprotec,v2xeg_eqaccess,v2xeg_eqdr)
+
+```
+
+```{r}
+
+# Omit entries that have missing values
+dem <- na.omit(dem) 
+
+# Copy initial dataframe for further reference
+dem2<-dem
+dem2$count<- seq.int(nrow(dem2))
+
+# Create identificator variable based on country-year info
+dem$id <-paste(dem$country_name, as.character(dem$year))
+
+
+# Select mid-level indicators—21 in total, as well as identificator variables
+dem<-dem %>% select(id,v2x_api,v2x_mpi,v2x_freexp_altinf,v2x_frassoc_thick,v2x_suffr,v2xel_frefair,v2x_elecoff, v2x_liberal, v2xcl_rol, v2x_jucon, v2xlg_legcon, v2x_partip, v2x_cspart,v2xdd_dd, v2xel_locelec, v2xel_regelec,v2xdl_delib, v2x_egal, v2xeg_eqprotec,v2xeg_eqaccess,v2xeg_eqdr)
+
+# Generate index
+rownames(dem) <- dem$id
+
+# Create new dataframe to be used for identification purposes
+id <-as.data.frame(dem$id)
+id$count <- seq.int(nrow(id))
+
+# Prepare initial dataframe for clustering
+dem<-dem %>% select(-id)
+```
+
+
+```{r}
+# Run the ProClus model
+p <-ProClus(dem,16,11)
+
+# Identify clusters
+clusters <- list()
+for ( i in 1:16 ) {
+  clusters[[i]] <- as.data.frame(p[[i]]$objects)
+}
+
+# Merge clusters with identifying variables 
+countries <- list()
+for ( i in 1:16 ) {
+  countries[[i]] <- merge(id, clusters[[i]] , by.x=c("count"), by.y=c("p[[i]]$objects"))
+  countries[[i]]$cluster <- i
+}
+
+# Create final dataframe with all country-years and their respective cluster
+countries_final <- do.call(rbind, countries)
+
+# Prepare dataframe for visualisation
+countries_final = merge(countries_final, dem2, by.x=c("count"), by.y=c("count"))
+countries_final <-countries_final %>% select(country_name,year,cluster)
+
+```
+
+
+```{r}
+# Identify CEE countries
+romania <-countries_final %>%subset(country_name=="Romania")
+poland <-countries_final%>%subset(country_name=="Poland")
+hungary <-countries_final %>%subset(country_name=="Hungary")
+germany <-countries_final %>%subset(country_name=="Germany")
+slovakia <-countries_final %>%subset(country_name=="Slovakia")
+czeschia <-countries_final %>%subset(country_name=="Czech Republic")
+
+# Export dataset
+
+write_xlsx(countries_final,"countries.xlsx")
+
+```
+
+
+```{r}
+ggplot(romania, aes(year, cluster))+ geom_line()+theme_stata()+
+labs(x="Year", y="Cluster", col="")
+
+```
+
+```{r}
+ggplot(poland, aes(year, cluster))+ geom_line()+theme_stata()+
+labs(x="Year", y="Cluster", col="")
+
+```
+
+```{r}
+ggplot(hungary, aes(year, cluster))+ geom_line()+theme_stata()+
+labs(x="Year", y="Cluster", col="")
+
+```
+
+```{r}
+ggplot() + 
+  geom_line(data=romania %>% filter(year>1945), aes(x=year ,y = cluster, color="Romania")) + 
+  geom_line(data=hungary %>% filter(year>1945), aes(x=year, y = cluster,color="Hungary"))+
+  geom_line(data=poland %>% filter(year>1945), aes(x=year, y = cluster,color="Poland"))+
+  geom_line(data=slovakia %>% filter(year>1945), aes(x=year, y = cluster,color="Slovakia"))+
+  geom_line(data=czeschia %>% filter(year>1945), aes(x=year, y = cluster,color="Czech Republic"))+
+  labs(x="Year", y="Cluster", col="")+
+  theme_stata()
+```
+
+
